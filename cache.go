@@ -1,30 +1,38 @@
 package shkvcache
 
-import "hash/fnv"
+import (
+	"context"
+	"hash/fnv"
+)
 
 // Cache is a partitioned map storing string key-value pairs across multiple shards.
 type Cache[V any] struct {
 	shardCount int
 	shards     []*shard[*Value[V]]
+	cleaner    *cleaner
 }
 
 // NewCache creates a new Cache.
-// If shardCount is 0, it defaults to 8.
-func NewCache[V any](shardCount int) (*Cache[V], error) {
-	if shardCount == 0 {
-		shardCount = 8
+func NewCache[V any](ctx context.Context, opts *Options) (*Cache[V], error) {
+	if err := opts.Validate(); err != nil {
+		return nil, err
 	}
-	if !isPowerOfTwo(shardCount) {
-		return nil, ErrInvalidShardCount
-	}
-	shards := make([]*shard[*Value[V]], shardCount)
+	shards := make([]*shard[*Value[V]], opts.ShardCount)
 	for i := range shards {
 		shards[i] = newShard[*Value[V]]()
 	}
-	return &Cache[V]{
-		shardCount: shardCount,
+	c := &Cache[V]{
+		shardCount: opts.ShardCount,
 		shards:     shards,
-	}, nil
+	}
+	c.cleaner = NewCleaner(ctx, opts.CleanerInterval, c.cleanExpired)
+	c.cleaner.Start()
+	return c, nil
+}
+
+// Close stops the cleaner goroutine.
+func (s *Cache[V]) Close() {
+	s.cleaner.Stop()
 }
 
 // getShard returns the shard corresponding to the given key based on FNV-1a hash.
