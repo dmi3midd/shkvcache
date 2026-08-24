@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Cleaner executes a periodic cleanup function on a fixed interval until stopped or canceled.
+// cleaner executes a periodic cleanup function on a fixed interval until stopped or canceled.
 type cleaner struct {
 	interval  int // in seconds
 	cleanFunc func()
@@ -13,9 +13,9 @@ type cleaner struct {
 	cancel    context.CancelFunc
 }
 
-// NewCleaner creates a new cleaner with the given interval and cleanup function.
+// newCleaner creates a new cleaner with the given interval and cleanup function.
 // If parentCtx is nil, context.Background() is used.
-func NewCleaner(parentCtx context.Context, interval int, cleanFunc func()) *cleaner {
+func newCleaner(parentCtx context.Context, interval int, cleanFunc func()) *cleaner {
 	if parentCtx == nil {
 		parentCtx = context.Background()
 	}
@@ -28,13 +28,13 @@ func NewCleaner(parentCtx context.Context, interval int, cleanFunc func()) *clea
 	}
 }
 
-// Start runs the cleaner background loop in a new goroutine.
-func (c *cleaner) Start() {
+// start runs the cleaner background loop in a new goroutine.
+func (c *cleaner) start() {
 	go c.run()
 }
 
-// Stop stops the background cleaner loop.
-func (c *cleaner) Stop() {
+// stop stops the background cleaner loop.
+func (c *cleaner) stop() {
 	c.cancel()
 }
 

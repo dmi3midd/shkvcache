@@ -2,18 +2,18 @@ package shkvcache
 
 import "time"
 
-// Value represents a string value with optional expiration time.
-// If expiresAt is 0, the Value has no expiration.
-type Value[V any] struct {
+// value represents a string value with optional expiration time.
+// If expiresAt is 0, the value has no expiration.
+type value[V any] struct {
 	val       V
 	expiresAt int64
 }
 
-// NewValue creates a new Value.
-// Returns false if the Value if ttl is negative.
-func newValue[V any](value V, ttl int64) (*Value[V], bool) {
-	v := &Value[V]{
-		val: value,
+// newValue creates a new value.
+// Returns false if the value if ttl is negative.
+func newValue[V any](val V, ttl int64) (*value[V], bool) {
+	v := &value[V]{
+		val: val,
 	}
 	ok := v.expire(ttl)
 	if ok {
@@ -22,23 +22,23 @@ func newValue[V any](value V, ttl int64) (*Value[V], bool) {
 	return nil, false
 }
 
-// GetValue returns the string value of the Value.
-func (v *Value[V]) getValue() V {
+// getValue returns the string value of the value.
+func (v *value[V]) getValue() V {
 	return v.val
 }
 
-// IsExpired returns true if the Value has an expiration time and is expired.
-// Returns false if the Value has no expiration time or is not yet expired.
-func (v *Value[V]) isExpired() bool {
+// isExpired returns true if the value has an expiration time and is expired.
+// Returns false if the value has no expiration time or is not yet expired.
+func (v *value[V]) isExpired() bool {
 	if v.expiresAt == 0 {
 		return false
 	}
 	return time.Now().Unix() > v.expiresAt
 }
 
-// Expire sets or updates the expiration time for the Value.
-// Returns false if the Value if ttl is negative.
-func (v *Value[V]) expire(ttl int64) bool {
+// expire sets or updates the expiration time for the value.
+// Returns false if the value if ttl is negative.
+func (v *value[V]) expire(ttl int64) bool {
 	if ttl < 0 {
 		return false
 	}
@@ -50,9 +50,9 @@ func (v *Value[V]) expire(ttl int64) bool {
 	return true
 }
 
-// TTL returns the remaining time-to-live in seconds.
-// Returns 0 if the Value has no expiration time.
-func (v *Value[V]) ttl() int64 {
+// ttl returns the remaining time-to-live in seconds.
+// Returns 0 if the value has no expiration time.
+func (v *value[V]) ttl() int64 {
 	if v.expiresAt == 0 {
 		return 0
 	}

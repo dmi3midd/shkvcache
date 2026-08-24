@@ -8,7 +8,7 @@ import (
 // Cache is a partitioned map storing string key-value pairs across multiple shards.
 type Cache[V any] struct {
 	shardCount int
-	shards     []*shard[*Value[V]]
+	shards     []*shard[*value[V]]
 	cleaner    *cleaner
 }
 
@@ -17,9 +17,9 @@ func NewCache[V any](ctx context.Context, opts *Options) (*Cache[V], error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
-	shards := make([]*shard[*Value[V]], opts.ShardCount)
+	shards := make([]*shard[*value[V]], opts.ShardCount)
 	for i := range shards {
-		shards[i] = newShard[*Value[V]]()
+		shards[i] = newShard[*value[V]]()
 	}
 	c := &Cache[V]{
 		shardCount: opts.ShardCount,
@@ -27,8 +27,8 @@ func NewCache[V any](ctx context.Context, opts *Options) (*Cache[V], error) {
 		cleaner:    nil,
 	}
 	if opts.RunCleaner {
-		c.cleaner = NewCleaner(ctx, opts.CleanerInterval, c.cleanExpired)
-		c.cleaner.Start()
+		c.cleaner = newCleaner(ctx, opts.CleanerInterval, c.cleanExpired)
+		c.cleaner.start()
 	}
 	return c, nil
 }
@@ -36,12 +36,12 @@ func NewCache[V any](ctx context.Context, opts *Options) (*Cache[V], error) {
 // Close stops the cleaner goroutine.
 func (s *Cache[V]) Close() {
 	if s.cleaner != nil {
-		s.cleaner.Stop()
+		s.cleaner.stop()
 	}
 }
 
 // getShard returns the shard corresponding to the given key based on FNV-1a hash.
-func (s *Cache[V]) getShard(key string) *shard[*Value[V]] {
+func (s *Cache[V]) getShard(key string) *shard[*value[V]] {
 	h := fnv.New32a()
 	h.Write([]byte(key))
 	idx := h.Sum32() & uint32(s.shardCount-1)
@@ -91,7 +91,7 @@ func (s *Cache[V]) Flush() {
 // Returns true if the key exists and expiration was set.
 // Returns false if the key does not exist or ttl is invalid.
 func (s *Cache[V]) Expire(key string, ttl int64) bool {
-	return s.getShard(key).update(key, func(i *Value[V]) bool {
+	return s.getShard(key).update(key, func(i *value[V]) bool {
 		if i.isExpired() {
 			return false
 		}
@@ -117,7 +117,7 @@ func (s *Cache[V]) TTL(key string) int64 {
 // cleanExpired removes all expired items across all shards.
 func (s *Cache[V]) cleanExpired() {
 	for _, shard := range s.shards {
-		shard.clean(func(key string, value *Value[V]) bool {
+		shard.clean(func(key string, value *value[V]) bool {
 			return value.isExpired()
 		})
 	}
