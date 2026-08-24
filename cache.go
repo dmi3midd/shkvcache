@@ -24,15 +24,20 @@ func NewCache[V any](ctx context.Context, opts *Options) (*Cache[V], error) {
 	c := &Cache[V]{
 		shardCount: opts.ShardCount,
 		shards:     shards,
+		cleaner:    nil,
 	}
-	c.cleaner = NewCleaner(ctx, opts.CleanerInterval, c.cleanExpired)
-	c.cleaner.Start()
+	if opts.RunCleaner {
+		c.cleaner = NewCleaner(ctx, opts.CleanerInterval, c.cleanExpired)
+		c.cleaner.Start()
+	}
 	return c, nil
 }
 
 // Close stops the cleaner goroutine.
 func (s *Cache[V]) Close() {
-	s.cleaner.Stop()
+	if s.cleaner != nil {
+		s.cleaner.Stop()
+	}
 }
 
 // getShard returns the shard corresponding to the given key based on FNV-1a hash.
