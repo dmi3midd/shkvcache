@@ -5,7 +5,7 @@ import "hash/fnv"
 // Cache is a partitioned map storing string key-value pairs across multiple shards.
 type Cache[V any] struct {
 	shardCount int
-	shards     []*Shard[*Value[V]]
+	shards     []*shard[*Value[V]]
 }
 
 // NewCache creates a new Cache with default shard count.
@@ -13,9 +13,9 @@ func NewCache[V any](shardCount int) (*Cache[V], error) {
 	if !isPowerOfTwo(shardCount) {
 		return nil, ErrInvalidShardCount
 	}
-	shards := make([]*Shard[*Value[V]], shardCount)
+	shards := make([]*shard[*Value[V]], shardCount)
 	for i := range shards {
-		shards[i] = NewShard[*Value[V]]()
+		shards[i] = newShard[*Value[V]]()
 	}
 	return &Cache[V]{
 		shardCount: shardCount,
@@ -24,7 +24,7 @@ func NewCache[V any](shardCount int) (*Cache[V], error) {
 }
 
 // getShard returns the shard corresponding to the given key based on FNV-1a hash.
-func (s *Cache[V]) getShard(key string) *Shard[*Value[V]] {
+func (s *Cache[V]) getShard(key string) *shard[*Value[V]] {
 	h := fnv.New32a()
 	h.Write([]byte(key))
 	idx := h.Sum32() & uint32(s.shardCount-1)
@@ -35,13 +35,13 @@ func (s *Cache[V]) getShard(key string) *Shard[*Value[V]] {
 // Returns zero value and false if the key does not exist or is expired.
 func (s *Cache[V]) Get(key string) (V, bool) {
 	shard := s.getShard(key)
-	i, ok := shard.Get(key)
+	i, ok := shard.get(key)
 	var zero V
 	if !ok {
 		return zero, false
 	}
 	if i.isExpired() {
-		shard.Delete(key)
+		shard.delete(key)
 		return zero, false
 	}
 	return i.getValue(), true
@@ -50,19 +50,19 @@ func (s *Cache[V]) Get(key string) (V, bool) {
 // Set sets or updates the value and optional TTL for the key in the sharded map.
 func (s *Cache[V]) Set(key string, value V, ttl int64) bool {
 	i := newValue(value, ttl)
-	s.getShard(key).Set(key, i)
+	s.getShard(key).set(key, i)
 	return true
 }
 
 // Delete removes the key from the sharded map.
 func (s *Cache[V]) Del(key string) {
-	s.getShard(key).Delete(key)
+	s.getShard(key).delete(key)
 }
 
 // Flush removes all items across all shards.
 func (s *Cache[V]) Flush() {
 	for _, shard := range s.shards {
-		shard.Flush(s.shardCount)
+		shard.flush(s.shardCount)
 	}
 }
 
@@ -70,7 +70,7 @@ func (s *Cache[V]) Flush() {
 // Returns true if the key exists and expiration was set.
 // Returns false if the key does not exist or ttl is invalid.
 func (s *Cache[V]) Expire(key string, ttl int64) bool {
-	return s.getShard(key).Update(key, func(i *Value[V]) bool {
+	return s.getShard(key).update(key, func(i *Value[V]) bool {
 		// if i.isExpired() {
 		// 	return false
 		// }
@@ -83,7 +83,7 @@ func (s *Cache[V]) Expire(key string, ttl int64) bool {
 // Returns -1 if the key exists and has no expiration time.
 // Returns -2 if the key does not exist or is expired.
 func (s *Cache[V]) TTL(key string) int64 {
-	i, ok := s.getShard(key).Get(key)
+	i, ok := s.getShard(key).get(key)
 	if !ok || i.isExpired() {
 		return -2
 	}
@@ -96,7 +96,7 @@ func (s *Cache[V]) TTL(key string) int64 {
 // CleanExpired removes all expired items across all shards.
 func (s *Cache[V]) CleanExpired() {
 	for _, shard := range s.shards {
-		shard.Clean(func(key string, value *Value[V]) bool {
+		shard.clean(func(key string, value *Value[V]) bool {
 			return value.isExpired()
 		})
 	}
