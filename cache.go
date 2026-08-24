@@ -8,8 +8,12 @@ type Cache[V any] struct {
 	shards     []*shard[*Value[V]]
 }
 
-// NewCache creates a new Cache with default shard count.
+// NewCache creates a new Cache.
+// If shardCount is 0, it defaults to 8.
 func NewCache[V any](shardCount int) (*Cache[V], error) {
+	if shardCount == 0 {
+		shardCount = 8
+	}
 	if !isPowerOfTwo(shardCount) {
 		return nil, ErrInvalidShardCount
 	}
@@ -48,8 +52,12 @@ func (s *Cache[V]) Get(key string) (V, bool) {
 }
 
 // Set sets or updates the value and optional TTL for the key in the sharded map.
+// Returns false if ttl is negative.
 func (s *Cache[V]) Set(key string, value V, ttl int64) bool {
-	i := newValue(value, ttl)
+	i, ok := newValue(value, ttl)
+	if !ok {
+		return false
+	}
 	s.getShard(key).set(key, i)
 	return true
 }
@@ -71,9 +79,9 @@ func (s *Cache[V]) Flush() {
 // Returns false if the key does not exist or ttl is invalid.
 func (s *Cache[V]) Expire(key string, ttl int64) bool {
 	return s.getShard(key).update(key, func(i *Value[V]) bool {
-		// if i.isExpired() {
-		// 	return false
-		// }
+		if i.isExpired() {
+			return false
+		}
 		ok := i.expire(ttl)
 		return ok
 	})
@@ -93,8 +101,8 @@ func (s *Cache[V]) TTL(key string) int64 {
 	return i.ttl()
 }
 
-// CleanExpired removes all expired items across all shards.
-func (s *Cache[V]) CleanExpired() {
+// cleanExpired removes all expired items across all shards.
+func (s *Cache[V]) cleanExpired() {
 	for _, shard := range s.shards {
 		shard.clean(func(key string, value *Value[V]) bool {
 			return value.isExpired()

@@ -10,11 +10,16 @@ type Value[V any] struct {
 }
 
 // NewValue creates a new Value.
-func newValue[V any](value V, ttl int64) *Value[V] {
-	return &Value[V]{
-		val:       value,
-		expiresAt: time.Now().Unix() + ttl,
+// Returns false if the Value if ttl is negative.
+func newValue[V any](value V, ttl int64) (*Value[V], bool) {
+	v := &Value[V]{
+		val: value,
 	}
+	ok := v.expire(ttl)
+	if ok {
+		return v, true
+	}
+	return nil, false
 }
 
 // GetValue returns the string value of the Value.
@@ -32,11 +37,8 @@ func (v *Value[V]) isExpired() bool {
 }
 
 // Expire sets or updates the expiration time for the Value.
-// Returns false if the Value is already expired or if ttl is negative.
+// Returns false if the Value if ttl is negative.
 func (v *Value[V]) expire(ttl int64) bool {
-	if v.isExpired() {
-		return false
-	}
 	if ttl < 0 {
 		return false
 	}
